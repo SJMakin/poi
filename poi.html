@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced 2D Virtual Poi Visualization with Auto Direction Change</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #gui {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="gui"></div>
+    <script> let poi,
+            silhouette,
+            gui;
+        const params = {
+            armLength: 150,
+            tetherLength: 150,
+            armSpeed: 0.02,
+            tetherSpeed: 0.05,
+            armDirection: 1,
+            tetherDirection: 1,
+            trailLength: 20,
+            poiColor: [
+                255,
+                0,
+                0
+            ],
+            showSilhouette: true,
+            showTrail: true,
+            trailFade: true,
+            poiSize: 20,
+            backgroundColor: [
+                220,
+                220,
+                220
+            ],
+            preset: 'Default',
+            trailSize: 1,
+            autoChangeDirection: false,
+            directionChangeInterval: Math.PI
+        };
+        const presets = {
+            'Default': {
+                armLength: 150,
+                tetherLength: 150,
+                armSpeed: 0.02,
+                tetherSpeed: 0.05,
+                armDirection: 1,
+                tetherDirection: 1,
+                trailLength: 20,
+                poiColor: [
+                    255,
+                    0,
+                    0
+                ],
+                trailSize: 1
+            },
+            'Flower': {
+                armLength: 150,
+                tetherLength: 200,
+                armSpeed: 0.03,
+                tetherSpeed: 0.08,
+                armDirection: 1,
+                tetherDirection: - 1,
+                trailLength: 50,
+                poiColor: [
+                    0,
+                    255,
+                    0
+                ],
+                trailSize: 2
+            },
+            'Spiral': {
+                armLength: 80,
+                tetherLength: 120,
+                armSpeed: 0.01,
+                tetherSpeed: 0.1,
+                armDirection: 1,
+                tetherDirection: 1,
+                trailLength: 100,
+                poiColor: [
+                    0,
+                    0,
+                    255
+                ],
+                trailSize: 3
+            },
+            'Chaos': {
+                armLength: 200,
+                tetherLength: 100,
+                armSpeed: 0.05,
+                tetherSpeed: 0.02,
+                armDirection: - 1,
+                tetherDirection: 1,
+                trailLength: 200,
+                poiColor: [
+                    255,
+                    255,
+                    0
+                ],
+                trailSize: 4
+            }
+        };
+        function setup() {
+            createCanvas(windowWidth, windowHeight);
+            poi = new Poi(
+                windowWidth / 2,
+                windowHeight / 2,
+                params.armLength,
+                params.tetherLength
+            );
+            silhouette = loadImage('silhouette.png');
+            setupGUI();
+        }
+        function setupGUI() {
+            gui = new dat.GUI({
+                autoPlace: false
+            });
+            document.getElementById('gui').appendChild(gui.domElement);
+            gui.add(params, 'preset', Object.keys(presets)).onChange(loadPreset);
+            gui.add(params, 'armLength', 50, 300).onChange(updatePoi);
+            gui.add(params, 'tetherLength', 50, 300).onChange(updatePoi);
+            gui.add(params, 'armSpeed', 0, 0.5).onChange(updatePoi);
+            gui.add(params, 'tetherSpeed', 0, 0.5).onChange(updatePoi);
+            gui.add(params, 'armDirection', {
+                Clockwise: 1,
+                Counterclockwise: - 1
+            }).onChange(updatePoi);
+            gui.add(params, 'tetherDirection', {
+                Clockwise: 1,
+                Counterclockwise: - 1
+            }).onChange(updatePoi);
+            gui.add(params, 'trailLength', 1, 500).step(1).onChange(updatePoi);
+            gui.add(params, 'trailSize', 1, 10).step(0.1).onChange(updatePoi);
+            gui.addColor(params, 'poiColor').onChange(updatePoi);
+            gui.add(params, 'showSilhouette');
+            gui.add(params, 'showTrail');
+            gui.add(params, 'trailFade');
+            gui.add(params, 'poiSize', 5, 50).onChange(updatePoi);
+            gui.addColor(params, 'backgroundColor');
+            gui.add(params, 'autoChangeDirection');
+            gui.add(params, 'directionChangeInterval', 0.1, TWO_PI).onChange(updatePoi);
+        }
+        function loadPreset() {
+            const preset = presets[params.preset];
+            for (let key in preset) {
+                params[key] = preset[key];
+            }
+            updatePoi();
+            for (let i in gui.controllers) {
+                gui.controllers[i].updateDisplay();
+            }
+        }
+        function updatePoi() {
+            poi.armLength = params.armLength;
+            poi.tetherLength = params.tetherLength;
+            poi.armSpeed = params.armSpeed;
+            poi.tetherSpeed = params.tetherSpeed;
+            poi.baseArmDirection = params.armDirection;
+            poi.tetherDirection = params.tetherDirection;
+            poi.trailLength = params.trailLength;
+            poi.color = color(params.poiColor);
+            poi.size = params.poiSize;
+            poi.trailSize = params.trailSize;
+            poi.angleThreshold = params.directionChangeInterval;
+        }
+        function draw() {
+            background(params.backgroundColor);
+            if (params.showSilhouette) {
+                image(silhouette, windowWidth / 2 - 150, windowHeight / 2 - 200, 300, 400);
+            }
+            updatePoi();
+            if (params.autoChangeDirection) {
+                poi.update();
+            } else {
+                poi.updateWithoutDirectionChange();
+            }
+            poi.display();
+        }
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+            poi.center = createVector(windowWidth / 2, windowHeight / 2);
+        }
+        class Poi {
+            constructor(x, y, armLength, tetherLength) {
+                this.center = createVector(x, y);
+                this.armLength = armLength;
+                this.tetherLength = tetherLength;
+                this.armAngle = 0;
+                this.tetherAngle = 0;
+                this.armSpeed = 0.02;
+                this.tetherSpeed = 0.05;
+                this.baseArmDirection = 1;
+                this.tetherDirection = 1;
+                this.color = color(255, 0, 0);
+                this.trail = [];
+                this.trailLength = 20;
+                this.size = 20;
+                this.trailSize = 1;
+                this.directionChangePattern = [
+                    1,
+                    1,
+                    - 1,
+                    1,
+                    - 1,
+                    - 1
+                ];
+                this.patternIndex = 0;
+                this.lastDirectionChangeAngle = 0;
+                this.angleThreshold = PI;
+                this.currentArmDirection = 1;
+            }
+            update() {
+                if (
+                    abs(this.armAngle - this.lastDirectionChangeAngle) >= this.angleThreshold
+                ) {
+                    this.changeArmDirection();
+                }
+                this.updateWithoutDirectionChange();
+            }
+            updateWithoutDirectionChange() {
+                this.armAngle += this.armSpeed * this.baseArmDirection * this.currentArmDirection;
+                this.tetherAngle += this.tetherSpeed * this.tetherDirection;
+                this.updatePoiPosition();
+            }
+            updatePoiPosition() {
+                let armEnd = createVector(
+                    this.center.x + cos(this.armAngle) * this.armLength,
+                    this.center.y + sin(this.armAngle) * this.armLength
+                );
+                let poiPos = createVector(
+                    armEnd.x + cos(this.tetherAngle) * this.tetherLength,
+                    armEnd.y + sin(this.tetherAngle) * this.tetherLength
+                );
+                this.trail.push(poiPos);
+                if (this.trail.length > this.trailLength) this.trail.shift();
+            }
+            changeArmDirection() {
+                this.currentArmDirection = this.directionChangePattern[this.patternIndex];
+                this.patternIndex = (this.patternIndex + 1) % this.directionChangePattern.length;
+                this.lastDirectionChangeAngle = this.armAngle;
+            }
+            display() {
+                stroke(100);
+                strokeWeight(2);
+                // Draw arm 
+                line(
+                    this.center.x,
+                    this.center.y,
+                    this.center.x + cos(this.armAngle) * this.armLength,
+                    this.center.y + sin(this.armAngle) * this.armLength
+                );
+                // Draw tether 
+                let armEnd = createVector(
+                    this.center.x + cos(this.armAngle) * this.armLength,
+                    this.center.y + sin(this.armAngle) * this.armLength
+                );
+                line(
+                    armEnd.x,
+                    armEnd.y,
+                    armEnd.x + cos(this.tetherAngle) * this.tetherLength,
+                    armEnd.y + sin(this.tetherAngle) * this.tetherLength
+                );
+                if (params.showTrail) {
+                    noStroke();
+                    // Draw trail 
+                    for (let i = 0; i < this.trail.length; i++) {
+                        let alpha = params.trailFade ? map(i, 0, this.trail.length - 1, 0, 255) : 100;
+                        let trailColor = color(red(this.color), green(this.color), blue(this.color), alpha);
+                        fill(trailColor);
+                        let size = map(
+                            i,
+                            0,
+                            this.trail.length - 1,
+                            5 * this.trailSize,
+                            this.size * this.trailSize
+                        );
+                        ellipse(this.trail[i].x, this.trail[i].y, size, size);
+                    }
+                }    // Draw poi ball 
+                fill(this.color);
+                ellipse(
+                    armEnd.x + cos(this.tetherAngle) * this.tetherLength,
+                    armEnd.y + sin(this.tetherAngle) * this.tetherLength,
+                    this.size,
+                    this.size
+                );
+            }
+        } 
+    </script>
+</body>
+
+</html>
