@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poi Spinning Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; }
+    </style>
+</head>
+<body>
+    <script>
+        let arm = { x: 0, y: 0 };
+        let hand = { x: 0, y: 0 };
+        let poi = { x: 0, y: 0, vx: 0, vy: 0 };
+        let tetherLength = 150;
+        let handRadius = 15;
+        let poiRadius = 10;
+        let armAngle = 0;
+        let handAngle = 0;
+        let gui;
+        let controls = {
+            armSpeed: 0.1,
+            handSpeed: -0.2,
+            gravity: 0.1,
+            damping: 0.995,
+            tension: 0.3,
+            armLength: 150,
+            handCircleSize: 20,
+            tracerLength: 100
+        };
+        let tracers = [];
+
+        function setup() {
+            createCanvas(windowWidth, windowHeight);
+            gui = new dat.GUI();
+            gui.add(controls, 'armSpeed', -0.5, 0.5);
+            gui.add(controls, 'handSpeed', -0.5, 0.5);
+            gui.add(controls, 'gravity', 0, 0.5);
+            gui.add(controls, 'damping', 0.9, 1);
+            gui.add(controls, 'tension', 0.00, 0.4);
+            gui.add(controls, 'armLength', 50, 250);
+            gui.add(controls, 'handCircleSize', 0, 150);
+            gui.add(controls, 'tracerLength', 10, 500).step(1);
+
+            // Initialize arm, hand, and poi positions
+            updatePositions();
+            poi.x = hand.x;
+            poi.y = hand.y + tetherLength;
+        }
+
+        function updatePositions() {
+            arm.x = width / 2 + cos(armAngle) * controls.armLength;
+            arm.y = height / 2 + sin(armAngle) * controls.armLength;
+            hand.x = arm.x + cos(handAngle) * controls.handCircleSize;
+            hand.y = arm.y + sin(handAngle) * controls.handCircleSize;
+        }
+
+        function draw() {
+            background(220);
+
+            // Move arm and hand
+            armAngle += controls.armSpeed;
+            handAngle += controls.handSpeed;
+            updatePositions();
+
+            // Calculate poi acceleration
+            let dx = hand.x - poi.x;
+            let dy = hand.y - poi.y;
+            let distance = sqrt(dx * dx + dy * dy);
+            let tensionForce = (distance - tetherLength) * controls.tension;
+
+            poi.vx += dx / distance * tensionForce;
+            poi.vy += dy / distance * tensionForce + controls.gravity;
+
+            // Apply damping
+            poi.vx *= controls.damping;
+            poi.vy *= controls.damping;
+
+            // Update poi position
+            poi.x += poi.vx;
+            poi.y += poi.vy;
+
+            // Update tracers
+            tracers.unshift({ x: poi.x, y: poi.y });
+            if (tracers.length > controls.tracerLength) {
+                tracers.pop();
+            }
+
+            // Draw tracers
+            noFill();
+            stroke(100, 200, 255, 100);
+            strokeWeight(2);
+            beginShape();
+            for (let t of tracers) {
+                vertex(t.x, t.y);
+            }
+            endShape();
+
+            // Draw arm
+            stroke(0);
+            strokeWeight(3);
+            line(width / 2, height / 2, arm.x, arm.y);
+
+            // Draw hand circle path
+            noFill();
+            stroke(200, 200, 255);
+            strokeWeight(1);
+            ellipse(arm.x, arm.y, controls.handCircleSize * 2);
+
+            // Draw hand
+            fill(255, 200, 200);
+            noStroke();
+            ellipse(hand.x, hand.y, handRadius * 2);
+
+            // Draw tether
+            stroke(100);
+            strokeWeight(2);
+            line(hand.x, hand.y, poi.x, poi.y);
+
+            // Draw poi
+            fill(100, 200, 255);
+            noStroke();
+            ellipse(poi.x, poi.y, poiRadius * 2);
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+        }
+    </script>
+</body>
+</html>
