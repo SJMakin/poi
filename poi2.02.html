@@ -1,0 +1,145 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verlet Poi Spinning Simulator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+    <script src="https://unpkg.com/verlet-js@0.0.5/verlet.js"></script>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; }
+    </style>
+</head>
+<body>
+    <script>
+        let sim;
+        let hand, poiHead;
+        let rope;
+        let tracers = [];
+        let gui;
+        let controls = {
+            ropeLength: 150,
+            segmentCount: 10,
+            poiMass: 1,
+            spinSpeed: 0.1,
+            tracerLength: 100,
+            colorScheme: 'Default'
+        };
+        let colorSchemes = {
+            'Default': { bg: [220], hand: [255, 200, 200], poi: [100, 200, 255], rope: [150], tracer: [100, 200, 255, 100] },
+            'Neon': { bg: [0], hand: [255, 0, 255], poi: [0, 255, 0], rope: [255], tracer: [0, 255, 255, 100] },
+            'Earthy': { bg: [200, 180, 160], hand: [120, 80, 40], poi: [60, 130, 50], rope: [100, 70, 40], tracer: [60, 130, 50, 100] }
+        };
+
+        function setup() {
+            createCanvas(windowWidth, windowHeight);
+            sim = new VerletJS(width, height, 1);
+            sim.gravity = new Vec2(0, 0.1);
+            
+            createPoi();
+
+            gui = new dat.GUI();
+            gui.add(controls, 'ropeLength', 50, 300).onChange(createPoi);
+            gui.add(controls, 'segmentCount', 5, 20).step(1).onChange(createPoi);
+            gui.add(controls, 'poiMass', 0.1, 5).onChange(updatePoiMass);
+            gui.add(controls, 'spinSpeed', 0, 0.5);
+            gui.add(controls, 'tracerLength', 10, 500).step(1);
+            gui.add(controls, 'colorScheme', Object.keys(colorSchemes));
+        }
+
+        function createPoi() {
+            sim.particles = [];
+            sim.constraints = [];
+
+            hand = sim.particles[sim.particles.push(new Particle(new Vec2(width/2, height/2))) - 1];
+            hand.pos = new Vec2(width/2, height/2);
+            hand.pinned = true;
+
+            rope = [];
+            let segmentLength = controls.ropeLength / controls.segmentCount;
+            
+            for (let i = 0; i <= controls.segmentCount; i++) {
+                let y = height/2 + i * segmentLength;
+                let particle = new Particle(new Vec2(width/2, y));
+                sim.particles.push(particle);
+                rope.push(particle);
+                
+                if (i > 0) {
+                    sim.constraints.push(new DistanceConstraint(rope[i-1], rope[i], 0.5));
+                }
+            }
+
+            poiHead = rope[rope.length - 1];
+            poiHead.radius = 10;
+            updatePoiMass();
+        }
+
+        function updatePoiMass() {
+            poiHead.mass = controls.poiMass;
+        }
+
+        function draw() {
+            let colors = colorSchemes[controls.colorScheme];
+            background(colors.bg);
+
+            updateHandPosition();
+            spinPoi();
+            sim.frame(16);
+            updateTracers();
+            drawScene(colors);
+        }
+
+        function updateHandPosition() {
+            hand.pos.x = mouseX;
+            hand.pos.y = mouseY;
+        }
+
+        function spinPoi() {
+            let angle = Math.atan2(poiHead.pos.y - hand.pos.y, poiHead.pos.x - hand.pos.x);
+            let force = new Vec2(Math.cos(angle + Math.PI/2), Math.sin(angle + Math.PI/2));
+            force.mutableScale(controls.spinSpeed);
+            poiHead.pos.mutableAdd(force);
+        }
+
+        function updateTracers() {
+            tracers.unshift({ x: poiHead.pos.x, y: poiHead.pos.y });
+            if (tracers.length > controls.tracerLength) {
+                tracers.pop();
+            }
+        }
+
+        function drawScene(colors) {
+            noFill();
+            stroke(colors.tracer);
+            strokeWeight(2);
+            beginShape();
+            for (let t of tracers) {
+                vertex(t.x, t.y);
+            }
+            endShape();
+
+            stroke(colors.rope);
+            strokeWeight(2);
+            for (let i = 1; i < rope.length; i++) {
+                line(rope[i-1].pos.x, rope[i-1].pos.y, rope[i].pos.x, rope[i].pos.y);
+            }
+
+            fill(colors.hand);
+            noStroke();
+            ellipse(hand.pos.x, hand.pos.y, 30);
+
+            fill(colors.poi);
+            noStroke();
+            ellipse(poiHead.pos.x, poiHead.pos.y, 20);
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+            sim.width = width;
+            sim.height = height;
+        }
+    </script>
+</body>
+</html>
